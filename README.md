@@ -151,16 +151,16 @@ Navigate to [http://localhost:8501](http://localhost:8501) in your browser. The 
 
 | Metric | Raw Mode | Cleaned Mode |
 |--------|----------|--------------|
-| Overall ASR | 20.0% | 12.5% |
+| Overall ASR | 20.0% | 15.0% |
 | Unsafe verdicts | 24 | 15 |
 | Blocked by Cleaner | 0 | 30 |
 
 **Key findings:**
-* **Token Flooding** was the most effective attack category (50% ASR), hitting all 6 models.
-* **Qwen small (3.95B)** and **Gemma small (4.3B)** were the most vulnerable models (35% ASR each).
-* **Llama small (6.74B)** was the most robust model overall (5% ASR).
+* **Token Flooding** was the most effective attack category (43.3% ASR), hitting 5 models.
+* **Qwen small (3.95B)** and **Gemma small (4.3B)** were the most vulnerable models (30% ASR each).
+* **Llama small (6.74B)** was the most robust model overall (5% Cleaned ASR).
 * **Parameter size does not predict guardrail strength** — family-level training methodology is the dominant factor.
-* The **Prompt Cleaner** reduced overall ASR by 7.5 percentage points, with the largest single-model reduction of 25 points on Qwen small.
+* The **Prompt Cleaner** reduced overall ASR by 5.0 percentage points, with the largest single-model reduction of 15 points on Qwen small.
 
 ---
 
