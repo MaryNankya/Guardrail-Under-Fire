@@ -152,7 +152,7 @@ Navigate to [http://localhost:8501](http://localhost:8501) in your browser. The 
 | Metric | Raw Mode | Cleaned Mode |
 |--------|----------|--------------|
 | Overall ASR | 20.0% | 15.0% |
-| Unsafe verdicts | 24 | 15 |
+| Unsafe verdicts | 24 | 18 |
 | Blocked by Cleaner | 0 | 30 |
 
 **Key findings:**
