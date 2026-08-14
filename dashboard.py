@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ── CONSTANTS ─────────────────────────────────────────────
-TOTAL_EXPECTED   = 240   # 20 prompts x 6 models x 2 modes (raw + cleaned)
+TOTAL_EXPECTED   = 384   # 32 main prompts x 6 models x 2 modes
 REFRESH_INTERVAL = 5
 
 MODEL_FAMILIES = {
@@ -76,19 +76,20 @@ with st.sidebar:
     st.markdown("- 6 Target Models (3 families)")
     st.markdown("- 3 Judge Models (Ensemble)")
     st.markdown("- 4 Attack Categories")
-    st.markdown("- 40 Adversarial Prompts")
+    st.markdown("- 32 Adversarial Prompts (main set)")
+    st.markdown("- 8 Held-Out Prompts (cleaner eval only)")
     st.markdown("- Majority Vote Scoring")
     st.markdown("- Prompt Cleaner Defense Layer")
     st.markdown("---")
-    auto_refresh = st.toggle("Auto-Refresh", value=True)
+    auto_refresh = st.toggle("Auto-Refresh", value=False)
     refresh_rate = st.slider("Refresh every (sec)", 3, 30, REFRESH_INTERVAL)
     if st.button("Force Refresh Now"):
         st.rerun()
     st.markdown("---")
     st.markdown("**MITRE ATLAS**")
-    st.markdown("AML.T0043 · AML.T0051 · AML.T0054")
+    st.markdown("AML.T0043 · AML.T0051 · AML.T0051.001 · AML.T0054")
     st.markdown("**OWASP LLM Top 10**")
-    st.markdown("LLM01 · LLM02")
+    st.markdown("LLM01 · LLM10")
 
 # ── MAIN ──────────────────────────────────────────────────
 st.title("Guardrail Under Fire — Live Attack Dashboard")
@@ -139,12 +140,12 @@ blocked     = len(df[df["final_verdict"] == "Blocked"])
 overall_asr = round(unsafe / total * 100, 1) if total > 0 else 0
 
 m1, m2, m3, m4, m5, m6 = st.columns(6)
-m1.metric("Overall ASR",          f"{overall_asr}%")
-m2.metric("Unsafe (Failed)",      unsafe)
-m3.metric("Safe (Held)",          safe)
-m4.metric("Partial",              partial)
-m5.metric("Ambiguous",            ambig)
-m6.metric("Blocked by Cleaner",   blocked)
+m1.metric("Overall ASR",        f"{overall_asr}%")
+m2.metric("Unsafe (Failed)",    unsafe)
+m3.metric("Safe (Held)",        safe)
+m4.metric("Partial",            partial)
+m5.metric("Ambiguous",          ambig)
+m6.metric("Blocked by Cleaner", blocked)
 
 st.markdown("---")
 
@@ -172,9 +173,8 @@ if not df_raw_dedup.empty and "cleaner_action" in df_raw_dedup.columns:
         action_counts.columns = ["Action", "Count"]
         fig_action = px.pie(
             action_counts, names="Action", values="Count",
-            color="Action",
-            color_discrete_map=ACTION_COLORS,
-            title="Cleaner Action Distribution across 40 Prompts",
+            color="Action", color_discrete_map=ACTION_COLORS,
+            title="Cleaner Action Distribution across 32 Main Prompts",
             hole=0.4,
         )
         st.plotly_chart(fig_action, use_container_width=True)
@@ -183,8 +183,7 @@ if not df_raw_dedup.empty and "cleaner_action" in df_raw_dedup.columns:
         cat_action = df_raw_dedup.groupby(["category", "cleaner_action"]).size().reset_index(name="Count")
         fig_cat_act = px.bar(
             cat_action, x="category", y="Count", color="cleaner_action",
-            barmode="stack",
-            color_discrete_map=ACTION_COLORS,
+            barmode="stack", color_discrete_map=ACTION_COLORS,
             title="Cleaner Action Breakdown by Attack Category",
             labels={"category": "Category", "cleaner_action": "Action"},
         )
@@ -194,8 +193,7 @@ if not df_raw_dedup.empty and "cleaner_action" in df_raw_dedup.columns:
     if "cleaner_score" in df_raw_dedup.columns:
         fig_score = px.histogram(
             df_raw_dedup, x="cleaner_score", nbins=20,
-            color="cleaner_action",
-            color_discrete_map=ACTION_COLORS,
+            color="cleaner_action", color_discrete_map=ACTION_COLORS,
             title="Threat Score Distribution per Prompt (0 = benign, 60+ = BLOCK threshold)",
             labels={"cleaner_score": "Threat Score", "cleaner_action": "Action"},
         )
@@ -347,7 +345,7 @@ if len(models) > 1:
         height=420,
     )
     st.plotly_chart(fig_transfer, use_container_width=True)
-    st.caption("Diagonal = self-consistency. High off-diagonal values indicate attacks transfer broadly across model families.")
+    st.caption("Diagonal = self-consistency. High off-diagonal values indicate attacks transfer broadly.")
 else:
     st.info("Transfer matrix requires results from at least 2 models.")
 
@@ -387,8 +385,7 @@ with col_v1:
     verdict_counts = df.groupby(["model_label", "final_verdict"]).size().reset_index(name="Count")
     fig_verdict = px.bar(
         verdict_counts, x="model_label", y="Count", color="final_verdict",
-        barmode="stack",
-        color_discrete_map=VERDICT_COLORS,
+        barmode="stack", color_discrete_map=VERDICT_COLORS,
         title="Verdict Breakdown per Model",
         labels={"model_label": "Model", "final_verdict": "Verdict"}
     )
@@ -402,11 +399,9 @@ with col_v2:
     cat_asr.columns = ["Category", "ASR (%)"]
     fig_cat = px.bar(
         cat_asr, x="ASR (%)", y="Category",
-        orientation="h",
-        color="ASR (%)",
+        orientation="h", color="ASR (%)",
         color_continuous_scale="Reds",
-        title="ASR by Attack Category",
-        text="ASR (%)"
+        title="ASR by Attack Category", text="ASR (%)"
     )
     fig_cat.update_traces(texttemplate="%{text}%", textposition="outside")
     fig_cat.update_layout(xaxis_range=[0, 110])
@@ -416,7 +411,7 @@ st.markdown("---")
 
 # ── JUDGE AGREEMENT ───────────────────────────────────────
 st.markdown("### Judge Ensemble Agreement Analysis")
-st.caption("Inter-judge agreement rate — how often each pair of judges agreed on the same verdict")
+st.caption("Pairwise agreement rate — how often each pair of judges agreed on the same verdict")
 
 judge_cols = ["judge_1_verdict", "judge_2_verdict", "judge_3_verdict"]
 if all(c in df.columns for c in judge_cols):
@@ -427,9 +422,9 @@ if all(c in df.columns for c in judge_cols):
     pct_all = round(all_agree / total_rows * 100, 1) if total_rows > 0 else 0
 
     pairs = [
-        ("Judge 1 vs 2", "judge_1_verdict", "judge_2_verdict"),
-        ("Judge 1 vs 3", "judge_1_verdict", "judge_3_verdict"),
-        ("Judge 2 vs 3", "judge_2_verdict", "judge_3_verdict"),
+        ("Mistral vs Phi4",    "judge_1_verdict", "judge_2_verdict"),
+        ("Mistral vs Falcon3", "judge_1_verdict", "judge_3_verdict"),
+        ("Phi4 vs Falcon3",    "judge_2_verdict", "judge_3_verdict"),
     ]
     agree_rows = []
     for label, c1, c2 in pairs:
@@ -439,17 +434,17 @@ if all(c in df.columns for c in judge_cols):
 
     ja1, ja2, ja3 = st.columns(3)
     ja1.metric("All 3 Judges Agree", f"{pct_all}%")
-    ja2.metric("Unanimous Safe",   f"{round(len(df[(df['judge_1_verdict']=='Safe')   & (df['judge_2_verdict']=='Safe')   & (df['judge_3_verdict']=='Safe')]  ) / total_rows * 100, 1)}%")
-    ja3.metric("Unanimous Unsafe", f"{round(len(df[(df['judge_1_verdict']=='Unsafe') & (df['judge_2_verdict']=='Unsafe') & (df['judge_3_verdict']=='Unsafe')]) / total_rows * 100, 1)}%")
+    ja2.metric("Unanimous Safe",
+               f"{round(len(df[(df['judge_1_verdict']=='Safe') & (df['judge_2_verdict']=='Safe') & (df['judge_3_verdict']=='Safe')]) / total_rows * 100, 1)}%")
+    ja3.metric("Unanimous Unsafe",
+               f"{round(len(df[(df['judge_1_verdict']=='Unsafe') & (df['judge_2_verdict']=='Unsafe') & (df['judge_3_verdict']=='Unsafe')]) / total_rows * 100, 1)}%")
 
     jc1, jc2 = st.columns(2)
     with jc1:
         fig_agree = px.bar(
             agree_df, x="Judge Pair", y="Agreement Rate (%)",
-            color="Agreement Rate (%)",
-            color_continuous_scale="Blues",
-            text="Agreement Rate (%)",
-            title="Pairwise Judge Agreement Rate",
+            color="Agreement Rate (%)", color_continuous_scale="Blues",
+            text="Agreement Rate (%)", title="Pairwise Judge Agreement Rate",
         )
         fig_agree.update_traces(texttemplate="%{text}%", textposition="outside")
         fig_agree.update_layout(yaxis_range=[0, 110], showlegend=False)
@@ -471,9 +466,9 @@ if all(c in df.columns for c in judge_cols):
             colorbar=dict(title="Count"),
         ))
         fig_vheat.update_layout(
-            title="Judge 1 vs Judge 2 Verdict Agreement Matrix",
-            xaxis_title="Judge 2 Verdict",
-            yaxis_title="Judge 1 Verdict",
+            title="Mistral vs Phi4 Verdict Agreement Matrix",
+            xaxis_title="Phi4 Verdict",
+            yaxis_title="Mistral Verdict",
             height=300,
         )
         st.plotly_chart(fig_vheat, use_container_width=True)
